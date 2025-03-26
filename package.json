@@ -1,0 +1,39 @@
+{
+  "name": "filelock",
+  "type": "module",
+  "version": "0.0.1",
+  "packageType": "module",
+  "description": "Provides flock(2) functionality",
+  "keywords": [
+    "flock",
+    "file lock",
+    "filelock"
+  ],
+  "exports": {
+    ".": {
+      "require": "./index.cjs",
+      "import": "./index.mjs"
+    }
+  },
+  "main": "index.mjs",
+  "author": "Shahab Ouraie - mailto:shahabouraie@gmail.com",
+  "license": "Mit",
+  "os": [
+    "linux"
+  ],
+  "binary": {
+    "napi_versions": [9]
+  },
+  "dependencies": {
+    "cmake-js": "*",
+    "node-addon-api": "*",
+    "bindings": "*"
+  },
+  "scripts": {
+    "preinstall": "echo 'Please provide sudo password to install cmake, ninja and gcc:'; sudo apt-get install -y build-essential cmake ninja-build",
+    "install": "cmake-js compile",
+    "clean": "cmake-js clean",
+    "rebuild": "cmake-js rebuild",
+    "rebuild:debug": "cmake-js rebuild --debug"
+  }
+}
