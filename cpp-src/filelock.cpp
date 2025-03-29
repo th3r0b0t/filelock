@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <string>           /* Pretty obvious */
 #include <napi.h>
+#include <iostream>
 #include "./asyncworker.hpp"
 
 
@@ -26,6 +27,7 @@ class filelock : public Napi::ObjectWrap<filelock>
   private:
     //-----------members
     int lockFD;
+    Napi::ObjectReference jsFileHandleRef;
     //-----------funcs
     Napi::Value acquireReadLock(const Napi::CallbackInfo& info);
     Napi::Value acquireWriteLock(const Napi::CallbackInfo& info);
@@ -43,10 +45,18 @@ int filelock::createLockfile(std::string lockfileName)
 
 void filelock::Finalize(Napi::Env env)
 {
+    std::cerr << "inside Finalize" << std::endl;
+    Napi::Value closeFD = jsFileHandleRef.Get("close");
+    closeFD.As<Napi::Function>().Call(jsFileHandleRef.Value(), {});
+    if( env.IsExceptionPending() )
+    {
+        env.GetAndClearPendingException().ThrowAsJavaScriptException();
+    }
+
     errno = 0;
     if( flock(lockFD, LOCK_UN) != 0 && errno != EBADF )
     {
-        Napi::Error::New(Env(), strerror(errno)).ThrowAsJavaScriptException();
+        Napi::Error::New(env, strerror(errno)).ThrowAsJavaScriptException();
     }
     return;
 }
@@ -79,8 +89,9 @@ NODE_API_MODULE(NODE_GYP_MODULE_NAME, Init)
 //===========================================================================================================================================================================================
 filelock::filelock(const Napi::CallbackInfo& info) : Napi::ObjectWrap<filelock>(info)
 {
-    Napi::Object jsFileHandle = info[0].As<Napi::Object>();
-    lockFD = jsFileHandle.Get("fd").ToNumber().Int32Value();
+    
+    jsFileHandleRef = Napi::Persistent( info[0].As<Napi::Object>() );
+    lockFD = jsFileHandleRef.Get("fd").ToNumber().Int32Value();
 
     return;
 }

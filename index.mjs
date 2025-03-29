@@ -5,7 +5,7 @@ const {filelock} =  createRequire(import.meta.url)("./build/Release/filelock.nod
 
 export default filelock;
 
-/*import {open, constants} from 'node:fs/promises';
+import {open, constants} from 'node:fs/promises';
 async function testing()
 {
     let fd = await open("/home/shahab/Desktop/testfile.txt", constants.O_CREAT | constants.O_RDWR, 0o600);
@@ -19,12 +19,11 @@ async function testing()
     console.log(await lock2.acquireWriteLock());
     console.log("lock2 Acquired write lock!");
 
-    await lock1.removeLock();
-    await fd.close();
-    await lock2.removeLock();
+    //await lock1.removeLock();
+    //await lock2.removeLock();
 }
 
 console.log("test1!");
 testing();
 console.log("test2!");
-console.log("done!");*/
+console.log("done!");
