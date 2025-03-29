@@ -1,7 +1,7 @@
 {
   "name": "filelock",
   "type": "module",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "packageType": "module",
   "description": "Provides flock(2) functionality",
   "keywords": [
@@ -30,7 +30,7 @@
     "bindings": "*"
   },
   "scripts": {
-    "preinstall": "echo 'Please provide sudo password to install cmake, ninja and gcc:'; sudo apt-get install -y build-essential cmake ninja-build",
+    "preinstall": "echo 'Please make sure cmake, ninja and gcc are installed!'",
     "install": "cmake-js compile",
     "clean": "cmake-js clean",
     "rebuild": "cmake-js rebuild",

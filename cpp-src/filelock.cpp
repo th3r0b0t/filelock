@@ -5,33 +5,27 @@
 * 3- https://github.com/nodejs/node-addon-api/blob/main/doc/class_property_descriptor.md
 */
 
-#include <iostream>
-#include <stdio.h>
-#include <unistd.h>         /* For unlink(2)/close(2) */
-#include <fcntl.h>          /* For O_* constants */
+//#include <unistd.h>         /* For unlink(2)/close(2) */
+#include <fcntl.h>          /* For open(2), O_* constants */
 #include <sys/file.h>       /* For flock(2) */
-#include <string>           /* Pretty obvious */
+#include <string.h>         /* For strerror(3) */
 #include <errno.h>
+#include <string>           /* Pretty obvious */
 #include <napi.h>
+#include "./asyncworker.hpp"
 
 
 //-----------------------CLASS----------------------//
-class filelock : public Napi::ObjectWrap<filelock>, public Napi::AsyncWorker
+class filelock : public Napi::ObjectWrap<filelock>
 {
   public:
     static Napi::Object Init(Napi::Env env, Napi::Object exports);  //This function is required by Node (actually a helper function for actual Init)!
-    void Finalize(Napi::Env env) override;                     //This must be public to be recognized by Napi
+    void Finalize(Napi::Env env) override;                          //This must be public to be recognized by Napi
     filelock(const Napi::CallbackInfo& info);
-    void Execute() override;
-    void OnOK() override;
-    void OnError(const Napi::Error& err) override;
-    Napi::Promise::Deferred deferred_promise;
     
   private:
     //-----------members
-    const std::string lockfiles_dir;
     int lockFD;
-    std::string requested_operation;
     //-----------funcs
     Napi::Value acquireReadLock(const Napi::CallbackInfo& info);
     Napi::Value acquireWriteLock(const Napi::CallbackInfo& info);
@@ -44,12 +38,16 @@ class filelock : public Napi::ObjectWrap<filelock>, public Napi::AsyncWorker
 //-------------------Internal-funcs-------------------//
 int filelock::createLockfile(std::string lockfileName)
 {
-    return open( ("/run/lock/" + lockfiles_dir + lockfileName).c_str(), O_RDWR | O_CREAT, 00700);
+    return open( ("/run/lock/" + lockfileName).c_str(), O_RDWR | O_CREAT, 00600);
 }
 
 void filelock::Finalize(Napi::Env env)
 {
-    flock(lockFD, LOCK_UN);
+    errno = 0;
+    if( flock(lockFD, LOCK_UN) != 0 && errno != EBADF )
+    {
+        Napi::Error::New(Env(), strerror(errno)).ThrowAsJavaScriptException();
+    }
     return;
 }
 //-------------------Internal-funcs-------------------//
@@ -79,9 +77,8 @@ NODE_API_MODULE(NODE_GYP_MODULE_NAME, Init)
 //-----------------JS-Requirements-----------------//
 
 //===========================================================================================================================================================================================
-filelock::filelock(const Napi::CallbackInfo& info) : Napi::ObjectWrap<filelock>(info), Napi::AsyncWorker(info.Env()), deferred_promise(info.Env()), lockfiles_dir("IDL/")
+filelock::filelock(const Napi::CallbackInfo& info) : Napi::ObjectWrap<filelock>(info)
 {
-    Napi::Env env = info.Env();
     Napi::Object jsFileHandle = info[0].As<Napi::Object>();
     lockFD = jsFileHandle.Get("fd").ToNumber().Int32Value();
 
@@ -90,60 +87,23 @@ filelock::filelock(const Napi::CallbackInfo& info) : Napi::ObjectWrap<filelock>(
 
 Napi::Value filelock::acquireReadLock(const Napi::CallbackInfo& info)
 {
-    requested_operation = "lock_sh";
-    this->Queue();
-    return deferred_promise.Promise();
-    
-    /*Napi::Env env = info.Env();
-    
-    if( flock(lockFD, LOCK_SH) == 0 )
-    { return Napi::Boolean::New(env, true); }
-    else
-    { return Napi::Boolean::New(env, false); }*/
+    asyncworker* asyncLocker = new asyncworker(info.Env(), lockFD, std::string("lock_sh"));
+    asyncLocker->Queue();
+    return asyncLocker->deferred_promise.Promise();
 }
 
 Napi::Value filelock::acquireWriteLock(const Napi::CallbackInfo& info)
 {
-    requested_operation = "lock_ex";
-    this->Queue();
-    return deferred_promise.Promise();
-
-    /*Napi::Env env = info.Env();
-    
-    if( flock(lockFD, LOCK_EX) == 0 )
-    { return Napi::Boolean::New(env, true); }
-    else
-    { return Napi::Boolean::New(env, false); }*/
+    asyncworker* asyncLocker = new asyncworker(info.Env(), lockFD, std::string("lock_ex"));
+    asyncLocker->Queue();
+    return asyncLocker->deferred_promise.Promise();
 }
 
 Napi::Value filelock::removeLock(const Napi::CallbackInfo& info)
 {
-    requested_operation = "lock_un";
-    this->Queue();
-    return deferred_promise.Promise();
-    
-    /*Napi::Env env = info.Env();
-    
-    if( flock(lockFD, LOCK_UN) == 0 )
-    { return Napi::Boolean::New(env, true); }
-    else
-    { return Napi::Boolean::New(env, false); }*/
+    asyncworker* asyncLocker = new asyncworker(info.Env(), lockFD, std::string("lock_un"));
+    asyncLocker->Queue();
+    return asyncLocker->deferred_promise.Promise();
 }
 
 //===========================================================================================================================================================================================
-void filelock::Execute()
-{
-    if(requested_operation == "lock_ex") { if( flock(lockFD, LOCK_EX) != 0 ) { SetError("Couldn't lock!"); } }
-    else if(requested_operation == "lock_sh") { if( flock(lockFD, LOCK_SH) != 0 ) { SetError("Couldn't lock!"); } }
-    else if(requested_operation == "lock_un") { if( flock(lockFD, LOCK_UN) != 0 ) { SetError("Couldn't unlock!"); } }
-}
-
-void filelock::OnOK()
-{
-    deferred_promise.Resolve(Napi::AsyncWorker::Env().Undefined());
-}
-
-void filelock::OnError(const Napi::Error& err)
-{
-    deferred_promise.Reject(err.Value());
-}
