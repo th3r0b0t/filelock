@@ -1,7 +1,7 @@
 {
   "name": "filelock",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "packageType": "module",
   "description": "Provides flock(2) functionality",
   "keywords": [

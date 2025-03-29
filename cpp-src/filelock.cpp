@@ -46,7 +46,7 @@ void filelock::Finalize(Napi::Env env)
     errno = 0;
     if( flock(lockFD, LOCK_UN) != 0 && errno != EBADF )
     {
-        Napi::Error::New(Env(), strerror(errno)).ThrowAsJavaScriptException();
+        Napi::Error::New(env, strerror(errno)).ThrowAsJavaScriptException();
     }
     return;
 }
