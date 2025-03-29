@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <string>           /* Pretty obvious */
 #include <napi.h>
+#include <iostream>
 #include "./asyncworker.hpp"
 
 
@@ -43,6 +44,7 @@ int filelock::createLockfile(std::string lockfileName)
 
 void filelock::Finalize(Napi::Env env)
 {
+    std::cerr << "Finalizing" << std::endl;
     errno = 0;
     if( flock(lockFD, LOCK_UN) != 0 && errno != EBADF )
     {
@@ -81,6 +83,7 @@ filelock::filelock(const Napi::CallbackInfo& info) : Napi::ObjectWrap<filelock>(
 {
     Napi::Object jsFileHandle = info[0].As<Napi::Object>();
     lockFD = jsFileHandle.Get("fd").ToNumber().Int32Value();
+    std::cerr << "lockFD: " << lockFD << std::endl;
 
     return;
 }
@@ -94,6 +97,7 @@ Napi::Value filelock::acquireReadLock(const Napi::CallbackInfo& info)
 
 Napi::Value filelock::acquireWriteLock(const Napi::CallbackInfo& info)
 {
+    std::cerr << "Acquiring WRITE lock" << std::endl;
     asyncworker* asyncLocker = new asyncworker(info.Env(), lockFD, std::string("lock_ex"));
     asyncLocker->Queue();
     return asyncLocker->deferred_promise.Promise();

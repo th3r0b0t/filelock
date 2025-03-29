@@ -6,6 +6,7 @@
 #include <string.h>         /* For strerror(3) */
 #include <string>
 #include <errno.h>
+#include <iostream>
 #include <napi.h>
 
 class asyncworker : public Napi::AsyncWorker

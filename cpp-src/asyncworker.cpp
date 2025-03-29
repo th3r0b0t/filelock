@@ -6,8 +6,14 @@ asyncworker::asyncworker(Napi::Env caller_env, int fd, std::string const operati
 
 void asyncworker::Execute()
 {
+    std::cerr << "Executing" << std::endl;
     errno = 0;
-    if(operation == "lock_ex") { if( flock(lockFD, LOCK_EX) != 0 ) { SetError("Couldn't lock! " + std::string(strerror(errno)) ); } }
+    if(operation == "lock_ex")
+    {
+        std::cerr << "flock(LOCK_EX).." << std::endl;
+        int res = flock(lockFD, LOCK_EX);
+        if( res != 0 ) { SetError("Couldn't lock! " + std::string(strerror(errno)) ); }
+    }
     else if(operation == "lock_sh") { if( flock(lockFD, LOCK_SH) != 0 ) { SetError("Couldn't lock! " + std::string(strerror(errno)) ); } }
     else if(operation == "lock_un") { if( flock(lockFD, LOCK_UN) != 0 && errno != EBADF ) { SetError("Couldn't unlock! " + std::string(strerror(errno)) ); } }
 }
@@ -38,10 +44,12 @@ void asyncworker::Execute()
 
 void asyncworker::OnOK()
 {
+    std::cerr << "OnOK" << std::endl;
     deferred_promise.Resolve(Napi::AsyncWorker::Env().Undefined());
 }
 
 void asyncworker::OnError(const Napi::Error& err)
 {
+    std::cerr << "OnError" << std::endl;
     deferred_promise.Reject(err.Value());
 }
