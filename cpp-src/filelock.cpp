@@ -5,7 +5,7 @@
 * 3- https://github.com/nodejs/node-addon-api/blob/main/doc/class_property_descriptor.md
 */
 
-//#include <unistd.h>         /* For unlink(2)/close(2) */
+#include <unistd.h>         /* For unlink(2)/close(2) */
 #include <fcntl.h>          /* For open(2), O_* constants */
 #include <sys/file.h>       /* For flock(2) */
 #include <string.h>         /* For strerror(3) */
@@ -20,34 +20,36 @@ class filelock : public Napi::ObjectWrap<filelock>
 {
   public:
     static Napi::Object Init(Napi::Env env, Napi::Object exports);  //This function is required by Node (actually a helper function for actual Init)!
-    void Finalize(Napi::Env env) override;                          //This must be public to be recognized by Napi
+    void Finalize(Napi::BasicEnv env) override;                          //This must be public to be recognized by Napi
     filelock(const Napi::CallbackInfo& info);
     
   private:
     //-----------members
     int lockFD;
+    bool FD_openedByAddon = false;
     //-----------funcs
     Napi::Value acquireReadLock(const Napi::CallbackInfo& info);
     Napi::Value acquireWriteLock(const Napi::CallbackInfo& info);
     Napi::Value removeLock(const Napi::CallbackInfo& info);
     //-----------Internal-funcs
-    int createLockfile(std::string lockfileName);
+    static int openExistingDir(std::string dirPath);
 };
 //-----------------------CLASS----------------------//
 
 //-------------------Internal-funcs-------------------//
-int filelock::createLockfile(std::string lockfileName)
+int filelock::openExistingDir(std::string dirPath)
 {
-    return open( ("/run/lock/" + lockfileName).c_str(), O_RDWR | O_CREAT, 00600);
+    return open( (dirPath).c_str(), O_RDONLY | O_DIRECTORY, 00600);
 }
 
-void filelock::Finalize(Napi::Env env)
+void filelock::Finalize(Napi::BasicEnv env)
 {
-    errno = 0;
+    if( FD_openedByAddon ) { close(lockFD); }
+    /*errno = 0;
     if( flock(lockFD, LOCK_UN) != 0 && errno != EBADF )
     {
         Napi::Error::New(env, strerror(errno)).ThrowAsJavaScriptException();
-    }
+    }*/
     return;
 }
 //-------------------Internal-funcs-------------------//
@@ -79,8 +81,16 @@ NODE_API_MODULE(NODE_GYP_MODULE_NAME, Init)
 //===========================================================================================================================================================================================
 filelock::filelock(const Napi::CallbackInfo& info) : Napi::ObjectWrap<filelock>(info)
 {
-    Napi::Object jsFileHandle = info[0].As<Napi::Object>();
-    lockFD = jsFileHandle.Get("fd").ToNumber().Int32Value();
+    if( info[0].IsObject() )
+    {
+        //Napi::Object jsFileHandle = info[0].As<Napi::Object>();
+        lockFD = info[0].As<Napi::Object>().Get("fd").ToNumber().Int32Value();
+    }
+    else if( info[0].IsString() )
+    {
+        lockFD = openExistingDir( std::string(info[0].As<Napi::String>()) );
+        FD_openedByAddon = true;
+    }
 
     return;
 }
